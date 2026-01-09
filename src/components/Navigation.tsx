@@ -199,6 +199,30 @@ const Navigation: React.FC = () => {
                 </Link>
               );
             })}
+            <Link
+              href="/settings"
+              onClick={closeMobileMenu}
+              className="flex items-center space-x-3 px-3 py-3 rounded-md text-base font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+            >
+              <span className="text-lg">⚙️</span>
+              <span>Settings</span>
+            </Link>
+            <Link
+              href="/disclaimer"
+              onClick={closeMobileMenu}
+              className="flex items-center space-x-3 px-3 py-3 rounded-md text-base font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+            >
+              <span className="text-lg">📋</span>
+              <span>Privacy</span>
+            </Link>
+            <a
+              href="/auth/logout"
+              onClick={closeMobileMenu}
+              className="flex items-center space-x-3 px-3 py-3 rounded-md text-base font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+            >
+              <span className="text-lg">🔒</span>
+              <span>Logout</span>
+            </a>
           </div>
         </div>
       )}

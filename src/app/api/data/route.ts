@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from "next/server";
-import { auth0 } from "@/lib/auth0";
+import { auth0, isAuth0Configured } from "@/lib/auth0";
 import { deleteUserCloudData, getUserCloudData, saveUserCloudData } from "@/lib/mongo";
 
 export const runtime = 'nodejs';
@@ -7,6 +7,13 @@ export const runtime = 'nodejs';
 // GET data
 
 export async function GET() {
+
+  if (!isAuth0Configured || !auth0 || !process.env.DATABASE_URL) {
+    return NextResponse.json(
+      { error: 'Cloud sync unavailable: Auth0 or database not configured' },
+      { status: 503 }
+    );
+  }
 
   // Get the user ID from the session
 
@@ -31,7 +38,14 @@ export async function GET() {
 
 // POST data
 
-export async function POST (request: NextRequest) {
+export async function POST(request: NextRequest) {
+
+  if (!isAuth0Configured || !auth0 || !process.env.DATABASE_URL) {
+    return NextResponse.json(
+      { error: 'Cloud sync unavailable: Auth0 or database not configured' },
+      { status: 503 }
+    );
+  }
 
   const session = await auth0.getSession();
 
@@ -66,7 +80,14 @@ export async function POST (request: NextRequest) {
   );
 }
 
-export async function DELETE () {
+export async function DELETE() {
+
+  if (!isAuth0Configured || !auth0 || !process.env.DATABASE_URL) {
+    return NextResponse.json(
+      { error: 'Cloud sync unavailable: Auth0 or database not configured' },
+      { status: 503 }
+    );
+  }
 
   const session = await auth0.getSession();
 

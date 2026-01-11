@@ -1,9 +1,22 @@
 import { Account, Balance, Transaction } from "@/types/finance";
 import { MongoClient } from "mongodb";
 
-const client = new MongoClient(process.env.DATABASE_URL as string);
+let client: MongoClient | null = null;
+
+function getClient(): MongoClient {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL environment variable is not set");
+  }
+  if (!client) {
+    client = new MongoClient(databaseUrl);
+  }
+  return client;
+}
 
 export async function getUserCloudData(userId: string): Promise<{ accounts: Account[]; balances: Balance[]; transactions?: Transaction[] } | null> {
+export async function getUserCloudData(userId: string): Promise<{ accounts: Account[]; balances: Balance[] } | null> {
+  const client = getClient();
   await client.connect();
   const db = client.db(process.env.MONGODB_DB_NAME);
   const userCollection = db.collection<{ userId: string; accounts: Account[]; balances: Balance[]; transactions?: Transaction[] }>("user_data");
@@ -22,6 +35,8 @@ export async function getUserCloudData(userId: string): Promise<{ accounts: Acco
 }
 
 export async function saveUserCloudData(userId: string, accounts: Account[], balances: Balance[], transactions: Transaction[]): Promise<void> {
+export async function saveUserCloudData(userId: string, accounts: Account[], balances: Balance[]): Promise<void> {
+  const client = getClient();
   await client.connect();
   const db = client.db(process.env.MONGODB_DB_NAME);
   const userCollection = db.collection<{ userId: string; accounts: Account[]; balances: Balance[]; transactions?: Transaction[] }>("user_data");
@@ -34,6 +49,7 @@ export async function saveUserCloudData(userId: string, accounts: Account[], bal
 }
 
 export async function deleteUserCloudData(userId: string): Promise<void> {
+  const client = getClient();
   await client.connect();
   const db = client.db(process.env.MONGODB_DB_NAME);
   const userCollection = db.collection<{ userId: string; accounts: Account[]; balances: Balance[]; transactions?: Transaction[] }>("user_data");

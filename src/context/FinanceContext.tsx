@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Account, Balance, AccountWithBalance, AccountWithHistory, Transaction } from '@/types/finance';
 import { allowCloudSync, isCloudSyncAllowed } from '@/lib/offline';
+import { computeCurrentBalance } from '@/lib/balance-history';
 
 interface FinanceContextType {
   accounts: Account[];
@@ -253,19 +254,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const getAccountsWithBalances = (): AccountWithBalance[] => {
-    return accounts.map(account => {
-      // Get the most recent balance for this account
-      const accountBalances = balances
-        .filter(balance => balance.accountId === account.id)
-        .sort((a, b) => b.date.getTime() - a.date.getTime());
-      
-      const currentBalance = accountBalances.length > 0 ? accountBalances[0].amount : 0;
-      
-      return {
-        ...account,
-        currentBalance,
-      };
-    });
+    return accounts.map(account => ({
+      ...account,
+      currentBalance: computeCurrentBalance(account.id, balances, transactions),
+    }));
     
   };
 
@@ -278,70 +270,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Update local transaction state
     const updatedTransactions = [...transactions, newTransaction];
     setTransactions(updatedTransactions);
-
-    // If linked to an account, update its balance
-    let updatedBalances = balances;
-    if (transactionData.accountId) {
-      const accountBalances = balances
-        .filter(b => b.accountId === transactionData.accountId)
-        .sort((a, b) => b.date.getTime() - a.date.getTime());
-      
-      const currentAmount = accountBalances.length > 0 ? accountBalances[0].amount : 0;
-      const newAmount = roundCurrency(transactionData.type === 'income' 
-        ? currentAmount + transactionData.amount 
-        : currentAmount - transactionData.amount);
-
-      const newBalance: Balance = {
-        id: crypto.randomUUID(),
-        accountId: transactionData.accountId,
-        amount: newAmount,
-        date: new Date(), // Always update 'current' balance state
-      };
-
-      updatedBalances = [...balances, newBalance];
-      setBalances(updatedBalances);
-    }
     
     if (isCloudSyncAllowed()) {
-      saveUserCloudData(accounts, updatedBalances, updatedTransactions);
+      saveUserCloudData(accounts, balances, updatedTransactions);
     }
   };
 
   const deleteTransaction = (transactionId: string) => {
-    // specific transaction to delete
-    const transactionToDelete = transactions.find(t => t.id === transactionId);
-    
     // remove from state
     const updatedTransactions = transactions.filter(t => t.id !== transactionId);
     setTransactions(updatedTransactions);
-
-    // If linked to an account, revert balance
-    let updatedBalances = balances;
-    if (transactionToDelete && transactionToDelete.accountId) {
-       const accountBalances = balances
-        .filter(b => b.accountId === transactionToDelete.accountId)
-        .sort((a, b) => b.date.getTime() - a.date.getTime());
-      
-      const currentAmount = accountBalances.length > 0 ? accountBalances[0].amount : 0;
-      
-      // Reverse logic: if it was income, subtract. If expense, add.
-      const newAmount = roundCurrency(transactionToDelete.type === 'income'
-        ? currentAmount - transactionToDelete.amount
-        : currentAmount + transactionToDelete.amount);
-
-      const newBalance: Balance = {
-        id: crypto.randomUUID(),
-        accountId: transactionToDelete.accountId,
-        amount: newAmount,
-        date: new Date(), // Revert timestamp is now
-      };
-      
-      updatedBalances = [...balances, newBalance];
-      setBalances(updatedBalances);
-    }
       
     if (isCloudSyncAllowed()) {
-      saveUserCloudData(accounts, updatedBalances, updatedTransactions);
+      saveUserCloudData(accounts, balances, updatedTransactions);
     }
   };
 
@@ -357,65 +298,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       t.id === transactionId ? updatedTransaction : t
     );
     setTransactions(updatedTransactions);
-
-    // Calculate balance updates
-    let updatedBalances = [...balances];
-    
-    // We need to ensure timestamps are distinct and sequential so sorting is deterministic
-    const now = new Date();
-    const revertTime = new Date(now.getTime());
-    const applyTime = new Date(now.getTime() + 10); // 10ms later to ensure it comes after
-
-    // 1. Revert original transaction effect
-    if (originalTransaction.accountId) {
-      const accountBalances = updatedBalances
-        .filter(b => b.accountId === originalTransaction.accountId)
-        .sort((a, b) => b.date.getTime() - a.date.getTime());
-      
-      const currentAmount = accountBalances.length > 0 ? accountBalances[0].amount : 0;
-      
-      // Reverse logic: if it was income, subtract. If expense, add.
-      const revertedAmount = roundCurrency(originalTransaction.type === 'income'
-        ? currentAmount - originalTransaction.amount
-        : currentAmount + originalTransaction.amount);
-
-      const partialBalance: Balance = {
-        id: crypto.randomUUID(),
-        accountId: originalTransaction.accountId,
-        amount: revertedAmount,
-        date: revertTime, 
-      };
-      updatedBalances = [...updatedBalances, partialBalance];
-    }
-
-    // 2. Apply new transaction effect (if still linked to an account)
-    // Note: We use the balances *after* reversion as the base
-    if (updatedTransaction.accountId) {
-      // If the account changed, we need to fetch the latest balance of the NEW account
-      const accountBalances = updatedBalances
-        .filter(b => b.accountId === updatedTransaction.accountId)
-        .sort((a, b) => b.date.getTime() - a.date.getTime());
-      
-      const currentAmount = accountBalances.length > 0 ? accountBalances[0].amount : 0;
-      
-      const newAmount = roundCurrency(updatedTransaction.type === 'income'
-        ? currentAmount + updatedTransaction.amount
-        : currentAmount - updatedTransaction.amount);
-
-      const finalBalance: Balance = {
-        id: crypto.randomUUID(),
-        accountId: updatedTransaction.accountId,
-        amount: newAmount,
-        date: applyTime,
-      };
-      
-      updatedBalances = [...updatedBalances, finalBalance];
-    }
-    
-    setBalances(updatedBalances);
-
     if (isCloudSyncAllowed()) {
-      saveUserCloudData(accounts, updatedBalances, updatedTransactions);
+      saveUserCloudData(accounts, balances, updatedTransactions);
     }
   };
 
